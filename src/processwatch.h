@@ -52,6 +52,7 @@ struct pw_opts_t {
   unsigned char show_mnemonics : 1;
   unsigned char show_extensions : 1;
   unsigned char use_cycles : 1;
+  unsigned char attribute_to_prev : 1;
   unsigned int sample_period;
   
   char *btf_custom_path;
@@ -101,6 +102,18 @@ typedef struct {
   int index;
   char *name;
   uint32_t name_hash;
+  /* Previous instruction tracking (for --prev mode) */
+  int has_prev;
+  int prev_success;
+  int prev_mnemonic;
+  int prev_category;
+#ifdef __x86_64__
+  int prev_extension;
+  int prev_is_locked;
+#elif __aarch64__
+  uint8_t prev_groups[8];
+  uint8_t prev_groups_count;
+#endif
 } process_t;
 
 #define MAX_PROCESSES 4194304
