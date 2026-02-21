@@ -79,32 +79,8 @@ static int single_insn_event(int cpu, int pid) {
     .size = sizeof(struct perf_event_attr),
   };
   
-#ifdef __aarch64__
-  attr.type = PERF_TYPE_RAW;
-  attr.config = 0x08;
-#elif __x86_64__
-  get_pmu_string(bpf_info->pmu_name);
-  /* Program INST_RETIRED.ANY (or equivalent) depending on PMU version */
-  if(strncmp(bpf_info->pmu_name, "skylake", 7) == 0) {
-    attr.type = PERF_TYPE_RAW;
-    attr.config = 0x00c0;
-  } else if(strncmp(bpf_info->pmu_name, "icelake", 7) == 0) {
-    attr.type = PERF_TYPE_RAW;
-    attr.config = 0x00c0;
-  } else if(strncmp(bpf_info->pmu_name, "sapphire_rapids", 7) == 0) {
-    attr.type = PERF_TYPE_RAW;
-    attr.config = 0x00c0;
-  } else if(strncmp(bpf_info->pmu_name, "ibs_op", 6) == 0) {
-    attr.type = get_ibs_op_type();
-    if (attr.type < 0)
-	    return -1;
-    attr.config = 0x80000;
-    attr.exclude_guest = 0;
-  } else {
-    attr.type = PERF_TYPE_SOFTWARE;
-    attr.config = PERF_COUNT_SW_CPU_CLOCK;
-  }
-#endif
+  attr.type = PERF_TYPE_HARDWARE;
+  attr.config = PERF_COUNT_HW_CPU_CYCLES;
 
   /* Attach the event, and handle the BPF linkages. */
   retval = open_and_attach_perf_event(&attr, cpu, pid, -1);
