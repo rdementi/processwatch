@@ -47,6 +47,7 @@ struct pw_opts_t {
   int pid;
   unsigned char show_mnemonics : 1;
   unsigned char show_extensions : 1;
+  unsigned char use_cycles : 1;
   unsigned int sample_period;
   
   char *btf_custom_path;
