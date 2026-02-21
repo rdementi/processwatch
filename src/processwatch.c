@@ -45,6 +45,7 @@ static struct option long_options[] = {
   {"list",          no_argument,       0, 'l'},
   {"btf",           required_argument, 0, 'b'},
   {"all",           no_argument,       0, 'a'},
+  {"cycles",        no_argument,       0, 'C'},
   {0,               0,                 0, 0}
 };
 
@@ -236,6 +237,7 @@ int read_opts(int argc, char **argv) {
   pw_opts.pid = -1;
   pw_opts.show_mnemonics = 0;
   pw_opts.show_extensions = 0;
+  pw_opts.use_cycles = 0;
   pw_opts.csv = 0;
   pw_opts.btf_custom_path = NULL;
   pw_opts.debug = 0;
@@ -250,7 +252,7 @@ int read_opts(int argc, char **argv) {
   
   while(1) {
     option_index = 0;
-    c = getopt_long(argc, argv, "hvdi:cp:ms:f:ln:b:ea",
+    c = getopt_long(argc, argv, "hvdi:cp:ms:f:ln:b:eaC",
                     long_options, &option_index);
     if(c == -1) {
       break;
@@ -278,7 +280,8 @@ int read_opts(int argc, char **argv) {
 #ifdef __x86_64__
         printf("  -e          Displays instruction extensions, instead of categories. Only for x86.\n");
 #endif
-        printf("  -s <samp>   Profiles instructions with a sampling period of <samp>. Defaults to 100000 instructions (1 in 100000 instructions).\n");
+        printf("  -s <samp>   Sampling period. Defaults to 100000 (1 in 100000 instructions or cycles).\n");
+        printf("  -C          Profiles cycles instead of instructions.\n");
 #ifdef __aarch64__
         printf("  -f <filter> Can be used multiple times. Defines filters for columns. Defaults to 'FPARMv8', 'NEON', 'SVE' and 'SVE2'.\n");
 #elif __x86_64__
@@ -331,6 +334,9 @@ int read_opts(int argc, char **argv) {
         break;
       case 'a':
         pw_opts.all = 1;
+        break;
+      case 'C':
+        pw_opts.use_cycles = 1;
         break;
       case 'l':
         pw_opts.list = 1;

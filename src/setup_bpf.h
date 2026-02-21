@@ -79,6 +79,10 @@ static int single_insn_event(int cpu, int pid) {
     .size = sizeof(struct perf_event_attr),
   };
   
+  if(pw_opts.use_cycles) {
+    attr.type = PERF_TYPE_HARDWARE;
+    attr.config = PERF_COUNT_HW_CPU_CYCLES;
+  } else {
 #ifdef __aarch64__
   attr.type = PERF_TYPE_RAW;
   attr.config = 0x08;
@@ -105,6 +109,7 @@ static int single_insn_event(int cpu, int pid) {
     attr.config = PERF_COUNT_SW_CPU_CLOCK;
   }
 #endif
+  }
 
   /* Attach the event, and handle the BPF linkages. */
   retval = open_and_attach_perf_event(&attr, cpu, pid, -1);
