@@ -82,6 +82,7 @@ static int single_insn_event(int cpu, int pid) {
   if(pw_opts.use_cycles) {
     attr.type = PERF_TYPE_HARDWARE;
     attr.config = PERF_COUNT_HW_CPU_CYCLES;
+    attr.precise_ip = 2;
   } else {
 #ifdef __aarch64__
   attr.type = PERF_TYPE_RAW;
