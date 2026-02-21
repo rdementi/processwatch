@@ -106,8 +106,8 @@ typedef struct {
   int has_prev;
   int prev_success;
   int prev_mnemonic;
-  int prev_category;
 #ifdef __x86_64__
+  int prev_category;
   int prev_extension;
   int prev_is_locked;
 #elif __aarch64__

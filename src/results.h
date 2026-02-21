@@ -127,8 +127,8 @@ static int handle_sample(void *ctx, void *data, size_t data_sz) {
       proc->has_prev = 1;
       proc->prev_success = success;
       proc->prev_mnemonic = mnemonic;
-      proc->prev_category = category;
 #ifdef __x86_64__
+      proc->prev_category = category;
       proc->prev_extension = extension;
       proc->prev_is_locked = is_locked;
 #elif __aarch64__
