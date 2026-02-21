@@ -33,10 +33,10 @@ static int handle_sample(void *ctx, void *data, size_t data_sz) {
 
   #ifdef __x86_64__
     ZyanStatus status;
-    status = ZydisDecoderDecodeInstruction(&results->decoder,
-                                           ZYAN_NULL,
-                                           insn_info->insn, 15,
-                                           &results->decoded_insn);
+    status = ZydisDecoderDecodeFull(&results->decoder,
+                                    insn_info->insn, 15,
+                                    &results->decoded_insn,
+                                    results->decoded_operands);
     if(ZYAN_SUCCESS(status)) {
       success = 1;
       mnemonic = results->decoded_insn.mnemonic;
@@ -75,6 +75,22 @@ static int handle_sample(void *ctx, void *data, size_t data_sz) {
     results->interval->proc_cat_count[category][interval_index]++;
     results->interval->ext_count[results->decoded_insn.meta.isa_ext]++;
     results->interval->proc_ext_count[extension][interval_index]++;
+
+    /* Detect lock-prefixed instructions with memory destination
+       or xchg with memory destination */
+    if (results->decoded_insn.attributes & ZYDIS_ATTRIB_HAS_LOCK) {
+      results->interval->cat_count[PW_CATEGORY_LOCKED]++;
+      results->interval->proc_cat_count[PW_CATEGORY_LOCKED][interval_index]++;
+    } else if (results->decoded_insn.mnemonic == ZYDIS_MNEMONIC_XCHG) {
+      int k;
+      for (k = 0; k < results->decoded_insn.operand_count_visible; k++) {
+        if (results->decoded_operands[k].type == ZYDIS_OPERAND_TYPE_MEMORY) {
+          results->interval->cat_count[PW_CATEGORY_LOCKED]++;
+          results->interval->proc_cat_count[PW_CATEGORY_LOCKED][interval_index]++;
+          break;
+        }
+      }
+    }
 #elif __aarch64__
     int i;
     // Capstone (LLVM) puts some instructions in 0, 1 or more groups

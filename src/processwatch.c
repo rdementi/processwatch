@@ -69,7 +69,7 @@ static char *default_ext_col_strs[1];
 
 #elif __x86_64__
   
-#define NUM_DEFAULT_COL_STRS 5
+#define NUM_DEFAULT_COL_STRS 6
 #define NUM_DEFAULT_MNEM_COL_STRS 0
 #define NUM_DEFAULT_EXT_COL_STRS 6
 static int num_default_col_strs = NUM_DEFAULT_COL_STRS;
@@ -80,7 +80,8 @@ static char *default_col_strs[NUM_DEFAULT_COL_STRS] = {
   "AVX",
   "AVX2",
   "AVX512",
-  "AMX_TILE"
+  "AMX_TILE",
+  "LOCKED"
 };
 static char *default_mnem_col_strs[NUM_DEFAULT_MNEM_COL_STRS] = {
 };
@@ -121,7 +122,7 @@ void list_opt() {
       /* Capstone aarch64 groups aren't consecutive :( */
       if (cs_group_name(handle, i) != NULL) printf("%s\n", cs_group_name(handle, i));
 #elif __x86_64__
-      printf("%s\n", ZydisCategoryGetString(i));
+      printf("%s\n", get_name(i));
 #endif
     }
   }
@@ -158,7 +159,7 @@ void convert_col_strs() {
 #ifdef __aarch64__
         name = cs_group_name(handle, n);
 #elif __x86_64__
-        name = ZydisCategoryGetString(n);
+        name = get_name(n);
 #endif
       }
       if(name && strncasecmp(pw_opts.col_strs[i], name, strlen(pw_opts.col_strs[i])) == 0) {
