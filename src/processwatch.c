@@ -46,6 +46,7 @@ static struct option long_options[] = {
   {"btf",           required_argument, 0, 'b'},
   {"all",           no_argument,       0, 'a'},
   {"cycles",        no_argument,       0, 'C'},
+  {"prev",          no_argument,       0, 'P'},
   {0,               0,                 0, 0}
 };
 
@@ -239,6 +240,7 @@ int read_opts(int argc, char **argv) {
   pw_opts.show_mnemonics = 0;
   pw_opts.show_extensions = 0;
   pw_opts.use_cycles = 0;
+  pw_opts.attribute_to_prev = 0;
   pw_opts.csv = 0;
   pw_opts.btf_custom_path = NULL;
   pw_opts.debug = 0;
@@ -253,7 +255,7 @@ int read_opts(int argc, char **argv) {
   
   while(1) {
     option_index = 0;
-    c = getopt_long(argc, argv, "hvdi:cp:ms:f:ln:b:eaC",
+    c = getopt_long(argc, argv, "hvdi:cp:ms:f:ln:b:eaCP",
                     long_options, &option_index);
     if(c == -1) {
       break;
@@ -283,6 +285,7 @@ int read_opts(int argc, char **argv) {
 #endif
         printf("  -s <samp>   Sampling period. Defaults to 100000 (1 in 100000 instructions or cycles).\n");
         printf("  -C          Profiles cycles instead of instructions.\n");
+        printf("  -P          Attributes event counts to the previous instruction.\n");
 #ifdef __aarch64__
         printf("  -f <filter> Can be used multiple times. Defines filters for columns. Defaults to 'FPARMv8', 'NEON', 'SVE' and 'SVE2'.\n");
 #elif __x86_64__
@@ -338,6 +341,9 @@ int read_opts(int argc, char **argv) {
         break;
       case 'C':
         pw_opts.use_cycles = 1;
+        break;
+      case 'P':
+        pw_opts.attribute_to_prev = 1;
         break;
       case 'l':
         pw_opts.list = 1;
