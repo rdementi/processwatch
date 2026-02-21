@@ -33,6 +33,7 @@ const char *get_name(int index) {
     return ZydisISAExtGetString(index);
 #endif
   } else {
+    if(index == PW_CATEGORY_LOCKED) return "LOCKED";
     return ZydisCategoryGetString(index);
   }
 #elif __aarch64__

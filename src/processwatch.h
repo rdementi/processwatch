@@ -29,8 +29,12 @@ csh handle;
 /* Maximums */
 #ifdef __x86_64__
 #define MNEMONIC_MAX_VALUE ZYDIS_MNEMONIC_MAX_VALUE
-#define CATEGORY_MAX_VALUE ZYDIS_CATEGORY_MAX_VALUE
 #define EXTENSION_MAX_VALUE ZYDIS_ISA_EXT_MAX_VALUE
+
+/* Custom categories beyond Zydis built-in categories */
+#define PW_CATEGORY_LOCKED (ZYDIS_CATEGORY_MAX_VALUE + 1)
+#define CATEGORY_MAX_VALUE PW_CATEGORY_LOCKED
+
 #elif __aarch64__
 #define MNEMONIC_MAX_VALUE (AArch64_INS_ALIAS_END-1)
 #define CATEGORY_MAX_VALUE (AArch64_GRP_ENDING-1)
@@ -200,6 +204,7 @@ typedef struct {
   ZydisDecoder            decoder;
   ZydisFormatter          formatter;
   ZydisDecodedInstruction decoded_insn;
+  ZydisDecodedOperand     decoded_operands[ZYDIS_MAX_OPERAND_COUNT];
 #endif
   
   /* The interval */
