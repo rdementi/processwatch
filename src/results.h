@@ -17,18 +17,29 @@ static int handle_sample(void *ctx, void *data, size_t data_sz) {
   struct insn_info *insn_info;
   int category, mnemonic, success;
   int interval_index;
+  int skip_sample;
+  process_t *proc;
 #ifdef __x86_64__
   int extension;
+  int is_locked;
+#elif __aarch64__
+  uint8_t groups[8];
+  uint8_t groups_count;
+  int i;
 #endif
   uint32_t hash;
 
   insn_info = data;
   success = 0;
+  skip_sample = 0;
   
   category = -1;
   mnemonic = -1;
 #ifdef __x86_64__
   extension = -1;
+  is_locked = 0;
+#elif __aarch64__
+  groups_count = 0;
 #endif
 
   #ifdef __x86_64__
@@ -44,6 +55,20 @@ static int handle_sample(void *ctx, void *data, size_t data_sz) {
 #ifdef __x86_64__
       extension = results->decoded_insn.meta.isa_ext;
 #endif
+
+      /* Detect lock-prefixed instructions with memory destination
+         or xchg with memory destination */
+      if (results->decoded_insn.attributes & ZYDIS_ATTRIB_HAS_LOCK) {
+        is_locked = 1;
+      } else if (results->decoded_insn.mnemonic == ZYDIS_MNEMONIC_XCHG) {
+        int k;
+        for (k = 0; k < results->decoded_insn.operand_count_visible; k++) {
+          if (results->decoded_operands[k].type == ZYDIS_OPERAND_TYPE_MEMORY) {
+            is_locked = 1;
+            break;
+          }
+        }
+      }
     }
   #elif __aarch64__
     int count;
@@ -52,6 +77,12 @@ static int handle_sample(void *ctx, void *data, size_t data_sz) {
     if(count && insn[0].detail) {
       success = 1;
       mnemonic = insn[0].id;
+      groups_count = insn[0].detail->groups_count;
+      if(groups_count > 8) groups_count = 8;
+      for(i = 0; i < groups_count; i++) {
+        groups[i] = insn[0].detail->groups[i];
+      }
+      cs_free(insn, count);
     }
   #endif
   
@@ -66,52 +97,88 @@ static int handle_sample(void *ctx, void *data, size_t data_sz) {
   /* Store this result in the per-process array */
   interval_index = get_interval_proc_arr_index(insn_info->pid);
 
-  if(success) {
-    results->interval->insn_count[mnemonic]++;
-    results->interval->proc_insn_count[mnemonic][interval_index]++;
-
+  /* In --prev mode, attribute the event count to the previous instruction */
+  if(pw_opts.attribute_to_prev) {
+    proc = get_process_info(insn_info->pid, hash);
+    if(proc->has_prev) {
+      /* Swap current decode results with the stored previous ones */
+      int tmp;
+      tmp = success; success = proc->prev_success; proc->prev_success = tmp;
+      tmp = mnemonic; mnemonic = proc->prev_mnemonic; proc->prev_mnemonic = tmp;
 #ifdef __x86_64__
-    results->interval->cat_count[results->decoded_insn.meta.category]++;
-    results->interval->proc_cat_count[category][interval_index]++;
-    results->interval->ext_count[results->decoded_insn.meta.isa_ext]++;
-    results->interval->proc_ext_count[extension][interval_index]++;
-
-    /* Detect lock-prefixed instructions with memory destination
-       or xchg with memory destination */
-    if (results->decoded_insn.attributes & ZYDIS_ATTRIB_HAS_LOCK) {
-      results->interval->cat_count[PW_CATEGORY_LOCKED]++;
-      results->interval->proc_cat_count[PW_CATEGORY_LOCKED][interval_index]++;
-    } else if (results->decoded_insn.mnemonic == ZYDIS_MNEMONIC_XCHG) {
-      int k;
-      for (k = 0; k < results->decoded_insn.operand_count_visible; k++) {
-        if (results->decoded_operands[k].type == ZYDIS_OPERAND_TYPE_MEMORY) {
-          results->interval->cat_count[PW_CATEGORY_LOCKED]++;
-          results->interval->proc_cat_count[PW_CATEGORY_LOCKED][interval_index]++;
-          break;
-        }
-      }
-    }
+      tmp = category; category = proc->prev_category; proc->prev_category = tmp;
+      tmp = extension; extension = proc->prev_extension; proc->prev_extension = tmp;
+      tmp = is_locked; is_locked = proc->prev_is_locked; proc->prev_is_locked = tmp;
 #elif __aarch64__
-    int i;
-    // Capstone (LLVM) puts some instructions in 0, 1 or more groups
-    for (i = 0; i < insn[0].detail->groups_count; i++) {
-      category = insn[0].detail->groups[i];
-      results->interval->cat_count[category]++;
-      results->interval->proc_cat_count[category][interval_index]++;
-    }
-    cs_free(insn, count);
+      {
+        uint8_t tmp_groups[8];
+        uint8_t tmp_count;
+        int j;
+        tmp_count = groups_count;
+        for(j = 0; j < tmp_count; j++) tmp_groups[j] = groups[j];
+        groups_count = proc->prev_groups_count;
+        for(j = 0; j < groups_count; j++) groups[j] = proc->prev_groups[j];
+        proc->prev_groups_count = tmp_count;
+        for(j = 0; j < tmp_count; j++) proc->prev_groups[j] = tmp_groups[j];
+      }
 #endif
-    
-  } else {
-    results->interval->num_failed++;
-    results->interval->proc_num_failed[interval_index]++;
-    results->num_failed++;
+    } else {
+      /* First sample for this process; store current and skip counting */
+      proc->has_prev = 1;
+      proc->prev_success = success;
+      proc->prev_mnemonic = mnemonic;
+#ifdef __x86_64__
+      proc->prev_category = category;
+      proc->prev_extension = extension;
+      proc->prev_is_locked = is_locked;
+#elif __aarch64__
+      {
+        int j;
+        proc->prev_groups_count = groups_count;
+        for(j = 0; j < groups_count; j++) proc->prev_groups[j] = groups[j];
+      }
+#endif
+      skip_sample = 1;
+    }
   }
 
-  results->interval->num_samples++;
-  results->interval->proc_num_samples[interval_index]++;
-  results->interval->pids[interval_index] = insn_info->pid;
-  results->num_samples++;
+  if(!skip_sample) {
+
+    if(success) {
+      results->interval->insn_count[mnemonic]++;
+      results->interval->proc_insn_count[mnemonic][interval_index]++;
+
+#ifdef __x86_64__
+      results->interval->cat_count[category]++;
+      results->interval->proc_cat_count[category][interval_index]++;
+      results->interval->ext_count[extension]++;
+      results->interval->proc_ext_count[extension][interval_index]++;
+
+      if(is_locked) {
+        results->interval->cat_count[PW_CATEGORY_LOCKED]++;
+        results->interval->proc_cat_count[PW_CATEGORY_LOCKED][interval_index]++;
+      }
+#elif __aarch64__
+      /* Capstone (LLVM) puts some instructions in 0, 1 or more groups */
+      for (i = 0; i < groups_count; i++) {
+        category = groups[i];
+        results->interval->cat_count[category]++;
+        results->interval->proc_cat_count[category][interval_index]++;
+      }
+#endif
+      
+    } else {
+      results->interval->num_failed++;
+      results->interval->proc_num_failed[interval_index]++;
+      results->num_failed++;
+    }
+
+    results->interval->num_samples++;
+    results->interval->proc_num_samples[interval_index]++;
+    results->interval->pids[interval_index] = insn_info->pid;
+    results->num_samples++;
+
+  }
 
   if(pthread_rwlock_unlock(&results_lock) != 0) {
     fprintf(stderr, "Failed to unlock the lock! Aborting.\n");

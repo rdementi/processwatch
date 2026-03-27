@@ -170,6 +170,7 @@ static void update_one_process_info(uint32_t pid, char *name, uint32_t hash, int
   process->name = strdup(name);
   process->name_hash = hash;
   process->index = results->pid_ctr++;
+  process->has_prev = 0;
   results->process_info.arr[pid][num_procs] = process;
   results->process_info.arr[pid][num_procs + 1] = NULL;
 }
@@ -191,6 +192,7 @@ static void add_process_info(uint32_t pid, char *name, uint32_t hash) {
   process->name = strdup(name);
   process->name_hash = hash;
   process->index = results->pid_ctr++;
+  process->has_prev = 0;
   
   /* Now add that process_t to the process_arr_t struct */
   results->process_info.arr[pid] = (process_t **) malloc(sizeof(process_t *) * 2);
